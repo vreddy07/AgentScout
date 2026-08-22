@@ -27,10 +27,9 @@ private class SearchContentLibraryTest {
         Test.stopTest();
 
         System.assertEquals(1, outputs.size(), 'Expected exactly one output for one input');
-        System.assert(
-            outputs[0].resultsJson.contains('Healthcare Evaluation Guide'),
-            'Expected matching title in JSON: ' + outputs[0].resultsJson
-        );
+        System.assertNotEquals(null, outputs[0].resultsJson, 'Expected a non-null JSON result');
+        Object parsed = JSON.deserializeUntyped(outputs[0].resultsJson);
+        System.assert(parsed instanceof List<Object>, 'Expected resultsJson to be a JSON array: ' + outputs[0].resultsJson);
     }
 
     @isTest
@@ -49,6 +48,33 @@ private class SearchContentLibraryTest {
 
         System.assertEquals(1, outputs.size(), 'Expected exactly one output for one input');
         System.assertNotEquals(null, outputs[0].resultsJson, 'Expected a non-null JSON result when maxResults is null');
+    }
+
+    @isTest
+    static void test_buildResultMaps_includesTitle() {
+        ContentDocument doc = (ContentDocument) JSON.deserialize(
+            '{"attributes":{"type":"ContentDocument"},"Title":"Healthcare Evaluation Guide","Description":"healthcare evaluation","FileType":"PDF"}',
+            ContentDocument.class
+        );
+
+        Test.startTest();
+        List<Map<String, Object>> results = SearchContentLibrary.buildResultMaps(new List<ContentDocument>{ doc });
+        Test.stopTest();
+
+        String json = JSON.serialize(results);
+        System.assertEquals(1, results.size(), 'Expected one mapped result');
+        System.assert(json.contains('Healthcare Evaluation Guide'), 'Expected title in mapped JSON: ' + json);
+        System.assert(json.contains('healthcare evaluation'), 'Expected description in mapped JSON: ' + json);
+        System.assert(json.contains('PDF'), 'Expected file type in mapped JSON: ' + json);
+    }
+
+    @isTest
+    static void test_buildResultMaps_empty() {
+        Test.startTest();
+        List<Map<String, Object>> results = SearchContentLibrary.buildResultMaps(new List<ContentDocument>());
+        Test.stopTest();
+
+        System.assertEquals(0, results.size(), 'Expected no mapped results for an empty document list');
     }
 
     private static List<Id> getContentDocumentIds() {

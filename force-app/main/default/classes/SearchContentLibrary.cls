@@ -28,20 +28,8 @@ public with sharing class SearchContentLibrary {
                     RETURNING ContentDocument(Id, Title, Description, FileType LIMIT :resultLimit)
                 ];
 
-                List<Map<String, Object>> results = new List<Map<String, Object>>();
-                if (!searchResults.isEmpty()) {
-                    for (SObject sobj : searchResults[0]) {
-                        ContentDocument doc = (ContentDocument) sobj;
-                        results.add(new Map<String, Object>{
-                            'id' => doc.Id,
-                            'title' => doc.Title,
-                            'description' => doc.Description,
-                            'fileType' => doc.FileType
-                        });
-                    }
-                }
-
-                output.resultsJson = JSON.serialize(results);
+                List<ContentDocument> docs = searchResults.isEmpty() ? new List<ContentDocument>() : (List<ContentDocument>) searchResults[0];
+                output.resultsJson = JSON.serialize(buildResultMaps(docs));
             } catch (Exception e) {
                 output.resultsJson = JSON.serialize(new Map<String, String>{ 'error' => e.getMessage() });
             }
@@ -49,5 +37,19 @@ public with sharing class SearchContentLibrary {
         }
 
         return outputs;
+    }
+
+    @TestVisible
+    private static List<Map<String, Object>> buildResultMaps(List<ContentDocument> docs) {
+        List<Map<String, Object>> results = new List<Map<String, Object>>();
+        for (ContentDocument doc : docs) {
+            results.add(new Map<String, Object>{
+                'id' => doc.Id,
+                'title' => doc.Title,
+                'description' => doc.Description,
+                'fileType' => doc.FileType
+            });
+        }
+        return results;
     }
 }

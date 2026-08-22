@@ -30,6 +30,24 @@ private class LogAgentInteractionTest {
     }
 
     @isTest
+    static void test_dmlFailureReturnsNullId() {
+        LogAgentInteraction.LogInput input = new LogAgentInteraction.LogInput();
+        input.topicName = 'Account Insights';
+        input.userQuery = 'What is the status of Acme Corporation?';
+        input.outcome = 'not_a_valid_outcome';
+        input.citedRecordIds = '';
+
+        Test.startTest();
+        List<LogAgentInteraction.LogOutput> outputs = LogAgentInteraction.logInteraction(
+            new List<LogAgentInteraction.LogInput>{ input }
+        );
+        Test.stopTest();
+
+        System.assertEquals(1, outputs.size(), 'Expected exactly one output for one input');
+        System.assertEquals(null, outputs[0].logId, 'Expected a null Id when the insert fails, not an exception');
+    }
+
+    @isTest
     static void test_bulkInsert() {
         List<LogAgentInteraction.LogInput> inputs = new List<LogAgentInteraction.LogInput>();
         for (Integer i = 0; i < 10; i++) {

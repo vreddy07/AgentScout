@@ -3,7 +3,6 @@
     <fullName>UserQuery__c</fullName>
     <label>User Query</label>
     <length>32768</length>
-    <required>true</required>
     <type>LongTextArea</type>
     <visibleLines>10</visibleLines>
 </CustomField>
