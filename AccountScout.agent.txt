@@ -1,0 +1,179 @@
+system:
+    instructions: "You are an AI Agent."
+    messages:
+        welcome: |
+            Hi, I'm an AI service assistant. How can I help you?
+        error: "Sorry, it looks like something has gone wrong."
+
+config:
+    agent_label: "AccountScout"
+    agent_template: "SvcCopilotTmpl__AgentforceServiceAgent"
+    developer_name: "AccountScout"
+    description: "Deliver personalized customer interactions with an autonomous AI agent. Agentforce Service Agent intelligently supports your customers with common inquiries and escalates complex issues."
+
+access:
+    default_agent_user: "accountscout@00dfj00000bjgnq2002407660.ext"
+
+variables:
+    EndUserId: linked string
+        source: @MessagingSession.MessagingEndUserId
+        description: "This variable may also be referred to as MessagingEndUser Id"
+    RoutableId: linked string
+        source: @MessagingSession.Id
+        description: "This variable may also be referred to as MessagingSession Id"
+    ContactId: linked string
+        source: @MessagingEndUser.ContactId
+        description: "This variable may also be referred to as MessagingEndUser ContactId"
+    EndUserLanguage: linked string
+        source: @MessagingSession.EndUserLanguage
+        description: "This variable may also be referred to as MessagingSession EndUserLanguage"
+    ChannelType: linked string
+        source: @MessagingSession.ChannelType
+        description: "This variable may also be referred to as MessagingSession ChannelType"
+
+language:
+    additional_locales: "en_GB"
+    default_locale: "en_US"
+    all_additional_locales: False
+
+knowledge:
+    rag_feature_config_id: ""
+    citations_url: ""
+    citations_enabled: False
+
+start_agent agent_router:
+    label: "Agent Router"
+    description: "Welcome the user and determine the appropriate subagent based on user input"
+    model_config:
+        model: "model://sfdc_ai__DefaultEinsteinHyperClassifier"
+    reasoning:
+        instructions: ->
+            | Select the best tool to call based on conversation history and user's intent.
+        actions:
+            go_to_GeneralFAQ: @utils.transition to @subagent.GeneralFAQ
+                description: "Use for general questions about the company, its products, policies, or business procedures. Do not use for anything about a specific Account's status, opportunities, contacts, or tasks."
+            go_to_Account_Research: @utils.transition to @subagent.Account_Research
+                description: "Use when the user asks about a specific Account's status, health, revenue, industry, owner, open opportunities, key contacts, outstanding tasks, or wants documents/collateral related to a topic or industry. Trigger phrases: 'account snapshot', 'account status', 'open opportunities for', 'contacts at'. Requires an 18-character Account ID."
+
+subagent GeneralFAQ:
+    label: "General FAQ"
+    description: "This subagent is for helping answer customer's questions by searching through the knowledge articles and providing information from those articles. The questions can be about the company and its products, policies or business procedures. Do not use this for questions about a specific Account's status, opportunities, contacts, or tasks — those belong to Account Research."
+    reasoning:
+        instructions: ->
+            | Your job is solely to help with issues and answer questions about the company, its products, procedures, or policies by searching knowledge articles.
+            | If the customer's question is too vague or general, ask for more details and clarification to give a better answer.
+            | If you are unable to help the customer even after asking clarifying questions, ask if they want to escalate this issue to a live agent.
+            | If you are unable to answer customer's questions, ask if they want to escalate this issue to a live agent.
+            | Never provide generic information, advice or troubleshooting steps, unless retrieved from searching knowledge articles.
+            | Include sources in your response when available from the knowledge articles, otherwise proceed without them.
+        actions:
+            AnswerQuestionsWithKnowledge: @actions.AnswerQuestionsWithKnowledge
+                with query = ...
+                with citationsUrl = ...
+                with ragFeatureConfigId = ...
+                with citationsEnabled = ...
+    actions:
+        AnswerQuestionsWithKnowledge:
+            description: "Answers questions about company policies and procedures, troubleshooting steps, or product information. For example: 'What is your return policy?' 'How do I fix an issue?' or 'What features does a product have?'"
+            label: "Answer Questions with Knowledge"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Getting answers"
+            source: "EmployeeCopilot__AnswerQuestionsWithKnowledge"
+            target: "standardInvocableAction://streamKnowledgeSearch"
+            inputs:
+                "query": string
+                    description: "Required. A string created by generative AI to be used in the knowledge article search."
+                    label: "Query"
+                    is_required: True
+                    is_user_input: True
+                "citationsUrl": string = @knowledge.citations_url
+                    description: "The URL to use for citations for custom Agents."
+                    label: "Citations Url"
+                    is_required: False
+                    is_user_input: True
+                "ragFeatureConfigId": string = @knowledge.rag_feature_config_id
+                    description: "The RAG Feature ID to use for grounding this copilot action invocation."
+                    label: "RAG Feature Configuration Id"
+                    is_required: False
+                    is_user_input: True
+                "citationsEnabled": boolean = @knowledge.citations_enabled
+                    description: "Whether or not citations are enabled."
+                    label: "Citations Enabled"
+                    is_required: False
+                    is_user_input: True
+            outputs:
+                "knowledgeSummary": object
+                    description: "A string formatted as rich text that includes a summary of the information retrieved from the knowledge articles and citations to those articles."
+                    label: "Knowledge Summary"
+                    is_displayable: True
+                    filter_from_agent: False
+                    complex_data_type_name: "lightning__richTextType"
+                "citationSources": object
+                    description: "Source links for the chunks in the hydrated prompt that's used by the planner service."
+                    label: "Citation Sources"
+                    is_displayable: False
+                    filter_from_agent: False
+                    complex_data_type_name: "@apexClassType/AiCopilot__GenAiCitationInput"
+
+
+subagent Account_Research:
+    label: "Account Research"
+    description: |
+        Use this topic when the user asks about a specific Account's status, health, revenue, industry, owner, open opportunities, deals, pipeline, key contacts, outstanding tasks/follow-ups, or wants sales collateral/documents related to a topic or industry. Trigger phrases include "account snapshot," "account status," "how is [account] doing," "open opportunities for," and "contacts at." Do not route generic company/product/policy questions here — use General FAQ for those.
+    reasoning:
+        instructions: ->
+            | Your job is to answer questions about a specific Salesforce Account by calling the Account_Research action with the Account's 18-character Account ID.
+            | If the user gives an Account Name instead of an ID, ask them to provide or confirm the exact Account ID, since this action requires an exact ID and cannot resolve names on its own.
+            | Summarize the account's industry, revenue, owner, up to 5 open opportunities, up to 3 recent contacts, and open task count from the returned JSON in a clear, readable way.
+            | After answering — or if you could not answer — always call LogAgentInteraction last, passing the topic name, the user's original question, the outcome ("success", "refusal", or "error"), and any record IDs you cited.
+        actions:
+            Account_Research: @actions.Account_Research
+                with accountId = ...
+            LogAgentInteraction: @actions.LogAgentInteraction
+                with citedRecordIds = ...
+                with outcome = ...
+                with topicName = ...
+                with userQuery = ...
+    actions:
+        Account_Research:
+            label: "Account Research"
+            description: |
+                Use this action when the user asks about an Account's status, open opportunities, contacts, or content/document recommendations.
+            target: "apex://GetAccountSnapshot"
+            inputs:
+                accountId: id
+                    label: "Account ID"
+                    description: "18-character Salesforce Account ID"
+                    is_required: True
+            outputs:
+                snapshotJson: string
+                    label: "Snapshot JSON"
+                    description: "The full result as a serialized JSON string"
+                    is_displayable: False
+                    filter_from_agent: False
+        LogAgentInteraction:
+            label: "LogAgentInteraction "
+            description: |
+                Inserts an AccountScoutLog__c record to audit agent activity. Always call this last, after answering or refusing the user's request.
+            target: "apex://LogAgentInteraction"
+            inputs:
+                citedRecordIds: string
+                    label: "Cited Record IDs"
+                    description: "Comma-separated list of cited record IDs"
+                    is_required: True
+                outcome: string
+                    label: "Outcome"
+                    description: "success, refusal, or error"
+                    is_required: True
+                topicName: string
+                    label: "Topic Name"
+                    is_required: True
+                userQuery: string
+                    label: "User Query"
+                    is_required: True
+            outputs:
+                logId: id
+                    label: "Log Id"
+                    is_displayable: False
+                    filter_from_agent: False
