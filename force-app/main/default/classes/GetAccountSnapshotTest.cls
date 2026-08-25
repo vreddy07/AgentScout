@@ -60,13 +60,18 @@ private class GetAccountSnapshotTest {
         Test.stopTest();
 
         System.assertEquals(1, outputs.size(), 'Expected exactly one output for one input');
-        String json = outputs[0].snapshotJson;
-        System.assert(json.contains('Acme Corporation'), 'Expected account name in JSON: ' + json);
-        System.assert(json.contains('Open Opp 1'), 'Expected first open opportunity in JSON: ' + json);
-        System.assert(json.contains('Open Opp 2'), 'Expected second open opportunity in JSON: ' + json);
-        System.assert(!json.contains('Closed Opp'), 'Closed opportunity should not appear in JSON: ' + json);
-        System.assert(json.contains('Alice Anderson'), 'Expected contact name in JSON: ' + json);
-        System.assert(json.contains('"openTaskCount":2'), 'Expected open task count of 2 in JSON: ' + json);
+        // NOTE: local variable named 'snapshotJson' — Apex is case-insensitive so naming it
+        // 'json' would clash with the JSON system class and cause a compile error.
+        String snapshotJson = outputs[0].snapshotJson;
+        System.assert(snapshotJson.contains('Acme Corporation'), 'Expected account name in JSON: ' + snapshotJson);
+        System.assert(snapshotJson.contains('Open Opp 1'), 'Expected first open opportunity in JSON: ' + snapshotJson);
+        System.assert(snapshotJson.contains('Open Opp 2'), 'Expected second open opportunity in JSON: ' + snapshotJson);
+        System.assert(!snapshotJson.contains('Closed Opp'), 'Closed opportunity should not appear in JSON: ' + snapshotJson);
+        System.assert(snapshotJson.contains('Alice Anderson'), 'Expected contact name in JSON: ' + snapshotJson);
+        // FIX: Deserialize to check openTaskCount as an integer, not as a raw string,
+        // so the assertion is immune to serialiser whitespace differences.
+        Map<String, Object> parsed = (Map<String, Object>) JSON.deserializeUntyped(snapshotJson);
+        System.assertEquals(2, (Integer) parsed.get('openTaskCount'), 'Expected open task count of 2');
     }
 
     @isTest
@@ -84,5 +89,24 @@ private class GetAccountSnapshotTest {
 
         System.assertEquals(1, outputs.size(), 'Expected exactly one output for one input');
         System.assert(outputs[0].snapshotJson.contains('error'), 'Expected error JSON, got: ' + outputs[0].snapshotJson);
+    }
+
+    // FIX: Added test for null accountId — WHERE Id = :null returns 0 rows,
+    // so the method should return the same "No account found" error JSON rather than throwing.
+    @isTest
+    static void test_nullAccountId() {
+        GetAccountSnapshot.AccountSnapshotInput input = new GetAccountSnapshot.AccountSnapshotInput();
+        input.accountId = null;
+
+        Test.startTest();
+        List<GetAccountSnapshot.AccountSnapshotOutput> outputs = GetAccountSnapshot.getSnapshot(
+            new List<GetAccountSnapshot.AccountSnapshotInput>{ input }
+        );
+        Test.stopTest();
+
+        System.assertEquals(1, outputs.size(), 'Expected exactly one output for a null input');
+        String json = outputs[0].snapshotJson;
+        System.assert(json != null, 'Output JSON must not be null for a null accountId');
+        System.assert(json.contains('error'), 'Expected an error JSON for a null accountId, got: ' + json);
     }
 }

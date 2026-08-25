@@ -41,6 +41,13 @@ public with sharing class LogAgentInteraction {
                 outputs.add(output);
             }
         } catch (Exception e) {
+            // FIX: Log the failure so it surfaces in Apex debug logs / Event Monitoring
+            // rather than silently swallowing the exception.
+            System.debug(
+                LoggingLevel.ERROR,
+                'LogAgentInteraction: DML insert failed — ' + e.getMessage()
+                + ' | Stack: ' + e.getStackTraceString()
+            );
             outputs.clear();
             for (Integer i = 0; i < inputs.size(); i++) {
                 LogOutput output = new LogOutput();

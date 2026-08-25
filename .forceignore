@@ -1,0 +1,3 @@
+# Agentforce Bot metadata is managed exclusively through Agent Builder in the org.
+# Deploying it via CLI throws "BotType can't be updated" — exclude it here.
+**/bots/**

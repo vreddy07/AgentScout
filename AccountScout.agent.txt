@@ -126,10 +126,14 @@ subagent Account_Research:
             | Your job is to answer questions about a specific Salesforce Account by calling the Account_Research action with the Account's 18-character Account ID.
             | If the user gives an Account Name instead of an ID, ask them to provide or confirm the exact Account ID, since this action requires an exact ID and cannot resolve names on its own.
             | Summarize the account's industry, revenue, owner, up to 5 open opportunities, up to 3 recent contacts, and open task count from the returned JSON in a clear, readable way.
+            | If the user also asks for sales collateral, case studies, guides, or documents related to a topic or industry, call SearchContentLibrary with the relevant keywords and present the matching documents as recommendations.
             | After answering — or if you could not answer — always call LogAgentInteraction last, passing the topic name, the user's original question, the outcome ("success", "refusal", or "error"), and any record IDs you cited.
         actions:
             Account_Research: @actions.Account_Research
                 with accountId = ...
+            SearchContentLibrary: @actions.SearchContentLibrary
+                with queryText = ...
+                with maxResults = ...
             LogAgentInteraction: @actions.LogAgentInteraction
                 with citedRecordIds = ...
                 with outcome = ...
@@ -139,7 +143,7 @@ subagent Account_Research:
         Account_Research:
             label: "Account Research"
             description: |
-                Use this action when the user asks about an Account's status, open opportunities, contacts, or content/document recommendations.
+                Use this action when the user asks about an Account's status, open opportunities, contacts, or open task count. Requires a valid 18-character Salesforce Account ID.
             target: "apex://GetAccountSnapshot"
             inputs:
                 accountId: id
@@ -150,6 +154,26 @@ subagent Account_Research:
                 snapshotJson: string
                     label: "Snapshot JSON"
                     description: "The full result as a serialized JSON string"
+                    is_displayable: False
+                    filter_from_agent: False
+        SearchContentLibrary:
+            label: "Search Content Library"
+            description: |
+                Use this action when the user asks for sales collateral, case studies, guides, or other documents related to a topic or industry. Pass the user's keywords as the search query. Do not use this to look up Account data — use Account Research for that.
+            target: "apex://SearchContentLibrary"
+            inputs:
+                queryText: string
+                    label: "Search Query"
+                    description: "Keywords to search for in the content library"
+                    is_required: True
+                maxResults: integer
+                    label: "Max Results"
+                    description: "Maximum number of document results to return (default 3 if omitted)"
+                    is_required: False
+            outputs:
+                resultsJson: string
+                    label: "Results JSON"
+                    description: "JSON array of matching documents with id, title, description, and fileType fields"
                     is_displayable: False
                     filter_from_agent: False
         LogAgentInteraction:

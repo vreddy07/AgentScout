@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <label>Account Scout Agent Access</label>
-    <description>Grants the AccountScout Agentforce bot user read access to Account, Opportunity, Contact, and Task, plus read/create access to AccountScoutLog__c, so the agent's Apex actions (which enforce WITH SECURITY_ENFORCED) can actually retrieve and log data.</description>
+    <description>AccountScout bot user: read on Account, Opportunity, Contact, Task, ContentDocument with full FLS for WITH SECURITY_ENFORCED queries; read/create on AccountScoutLog__c.</description>
     <hasActivationRequired>false</hasActivationRequired>
+
+    <!-- Object Permissions -->
     <objectPermissions>
         <object>Account</object>
         <allowCreate>false</allowCreate>
@@ -39,6 +41,16 @@
         <viewAllRecords>false</viewAllRecords>
         <modifyAllRecords>false</modifyAllRecords>
     </objectPermissions>
+    <!-- FIX: Added ContentDocument so SearchContentLibrary SOSL can read library files -->
+    <objectPermissions>
+        <object>ContentDocument</object>
+        <allowCreate>false</allowCreate>
+        <allowRead>true</allowRead>
+        <allowEdit>false</allowEdit>
+        <allowDelete>false</allowDelete>
+        <viewAllRecords>false</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
     <objectPermissions>
         <object>AccountScoutLog__c</object>
         <allowCreate>true</allowCreate>
@@ -48,11 +60,78 @@
         <viewAllRecords>false</viewAllRecords>
         <modifyAllRecords>false</modifyAllRecords>
     </objectPermissions>
+
+    <!-- Account field permissions — only non-required fields need explicit FLS.
+         Standard required fields (Name, Id) are auto-granted with object Read.
+         GetAccountSnapshot queries: Industry, AnnualRevenue, Owner.Name (via OwnerId) -->
+    <fieldPermissions>
+        <field>Account.Industry</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Account.AnnualRevenue</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <!-- Account.OwnerId is required — auto-granted, no FLS entry needed -->
+
+    <!-- Opportunity field permissions — non-required fields only.
+         Name, StageName, CloseDate, IsClosed are standard-required and auto-granted.
+         GetAccountSnapshot queries: Amount, AccountId (WHERE clause) -->
+    <fieldPermissions>
+        <field>Opportunity.Amount</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Opportunity.AccountId</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+
+    <!-- Contact field permissions — non-required fields only.
+         LastName is standard-required and auto-granted.
+         GetAccountSnapshot queries: FirstName, Title, Email, AccountId -->
+    <!-- Contact.FirstName is part of the compound Name field — no standalone FLS entry -->
+    <fieldPermissions>
+        <field>Contact.AccountId</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Contact.Title</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Contact.Email</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+
+    <!-- Task.WhatId is a polymorphic lookup — no standalone FLS entry supported.
+         Status is standard-required. Both are auto-granted with object Read. -->
+
+    <!-- ContentDocument field permissions for SearchContentLibrary SOSL.
+         Title is required (auto-granted); FileType is system-set (auto-granted).
+         Only Description needs an explicit FLS entry. -->
+    <fieldPermissions>
+        <field>ContentDocument.Description</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+
+    <!-- AccountScoutLog__c field permissions — all four fields written by LogAgentInteraction -->
+    <!-- NOTE: TopicName__c is a required field — auto-editable via object Create access, no FLS entry needed -->
     <fieldPermissions>
         <field>AccountScoutLog__c.UserQuery__c</field>
         <readable>true</readable>
         <editable>true</editable>
     </fieldPermissions>
+    <!-- NOTE: Outcome__c is a required field — Salesforce auto-grants editability to any
+         user with Create access on the object, so no fieldPermissions entry is needed
+         (deploying one throws "You cannot deploy to a required field"). -->
     <fieldPermissions>
         <field>AccountScoutLog__c.CitedRecordIds__c</field>
         <readable>true</readable>
