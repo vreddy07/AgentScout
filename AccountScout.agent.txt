@@ -44,17 +44,15 @@ knowledge:
 start_agent agent_router:
     label: "Agent Router"
     description: "Welcome the user and determine the appropriate subagent based on user input"
-    model_config:
-        model: "model://sfdc_ai__DefaultEinsteinHyperClassifier"
     reasoning:
         instructions: ->
             | Select the best tool to call based on conversation history and user's intent.
             | RULE: If the user's message contains an 18-character alphanumeric ID (typically starting with '001'), it is an Account request — always route to Account_Research. Do not ask clarifying questions at the router level.
         actions:
             go_to_GeneralFAQ: @utils.transition to @subagent.GeneralFAQ
-                description: "Use for general questions about the company, its products, policies, or business procedures. Do not use for anything about a specific Account's status, opportunities, contacts, or tasks."
+                description: "Use ONLY for general questions about the company, its products, policies, or procedures. NEVER use this if the user's message contains an 18-character ID or mentions an Account, snapshot, opportunities, or contacts."
             go_to_Account_Research: @utils.transition to @subagent.Account_Research
-                description: "Use when the user asks about a specific Account's status, health, revenue, industry, owner, open opportunities, key contacts, outstanding tasks, or wants documents/collateral related to a topic or industry. Trigger phrases: 'account snapshot', 'account status', 'open opportunities for', 'contacts at'. Requires an 18-character Account ID."
+                description: "ALWAYS use this when the user's message contains an 18-character alphanumeric ID (e.g. 001fj00001g5JhHAAU) or mentions 'account snapshot', 'account status', 'open opportunities for', or 'contacts at'. This is the ONLY correct route for any Account-related query."
 
 subagent GeneralFAQ:
     label: "General FAQ"
@@ -124,13 +122,13 @@ subagent Account_Research:
         Use this topic when the user asks about a specific Account's status, health, revenue, industry, owner, open opportunities, deals, pipeline, key contacts, outstanding tasks/follow-ups, or wants sales collateral/documents related to a topic or industry. Trigger phrases include "account snapshot," "account status," "how is [account] doing," "open opportunities for," and "contacts at." Do not route generic company/product/policy questions here — use General FAQ for those.
     reasoning:
         instructions: ->
-            | CRITICAL: When the user provides an 18-character Salesforce Account ID, you MUST immediately call the Account_Research action with that ID. Do NOT ask follow-up questions, do NOT ask which details they want, do NOT offer a menu of options. The action returns ALL account information at once — name, industry, revenue, owner, open opportunities, contacts, and open task count — so there is nothing to clarify.
+            | CRITICAL: When the user provides an 18-character Salesforce Account ID, you MUST immediately call the GetAccountSnapshot action with that ID. Do NOT ask follow-up questions, do NOT ask which details they want, do NOT offer a menu of options. The action returns ALL account information at once — name, industry, revenue, owner, open opportunities, contacts, and open task count — so there is nothing to clarify.
             | If the user gives an Account Name instead of an ID, ask for the exact 18-character ID only. Do not guess or attempt to resolve names.
             | Once you have the snapshot result, summarize the account's name, industry, annual revenue, owner, up to 5 open opportunities (name, stage, amount, close date), up to 3 recent contacts (name, title, email), and open task count in a clear structured response.
             | If the user also asks for documents, case studies, or sales collateral, call SearchContentLibrary with the relevant keywords after returning the snapshot.
             | Always call LogAgentInteraction last with: topicName = "Account Research", the user's original question, outcome = "success" / "refusal" / "error", and any record IDs cited.
         actions:
-            Account_Research: @actions.Account_Research
+            GetAccountSnapshot: @actions.GetAccountSnapshot
                 with accountId = ...
             SearchContentLibrary: @actions.SearchContentLibrary
                 with queryText = ...
@@ -141,13 +139,15 @@ subagent Account_Research:
                 with topicName = ...
                 with userQuery = ...
     actions:
-        Account_Research:
-            label: "Account Research"
+        GetAccountSnapshot:
+            label: "Get Account Snapshot"
+            require_user_confirmation: False
             description: |
                 Use this action when the user asks about an Account's status, open opportunities, contacts, or open task count. Requires a valid 18-character Salesforce Account ID.
             target: "apex://GetAccountSnapshot"
             inputs:
-                accountId: id
+                accountId: object
+                    complex_data_type_name: "lightning__recordIdType"
                     label: "Account ID"
                     description: "18-character Salesforce Account ID"
                     is_required: True
@@ -198,7 +198,8 @@ subagent Account_Research:
                     label: "User Query"
                     is_required: True
             outputs:
-                logId: id
+                logId: object
+                    complex_data_type_name: "lightning__recordIdType"
                     label: "Log Id"
                     is_displayable: False
                     filter_from_agent: False

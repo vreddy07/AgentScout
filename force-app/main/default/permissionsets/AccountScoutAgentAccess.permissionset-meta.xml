@@ -4,6 +4,20 @@
     <description>AccountScout bot user: read on Account, Opportunity, Contact, Task, ContentDocument with full FLS for WITH SECURITY_ENFORCED queries; read/create on AccountScoutLog__c.</description>
     <hasActivationRequired>false</hasActivationRequired>
 
+    <!-- Apex Class Access for Agent Actions -->
+    <classAccesses>
+        <apexClass>GetAccountSnapshot</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>SearchContentLibrary</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>LogAgentInteraction</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+
     <!-- Object Permissions -->
     <objectPermissions>
         <object>Account</object>
