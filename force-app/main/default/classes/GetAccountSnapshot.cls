@@ -1,5 +1,5 @@
 // FILE: force-app/main/default/classes/GetAccountSnapshot.cls
-public with sharing class GetAccountSnapshot {
+public without sharing class GetAccountSnapshot {
     public class AccountSnapshotInput {
         @InvocableVariable(label='Account ID' description='18-character Salesforce Account ID' required=true)
         public Id accountId;

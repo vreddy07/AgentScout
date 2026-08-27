@@ -123,11 +123,11 @@ subagent Account_Research:
         Use this topic when the user asks about a specific Account's status, health, revenue, industry, owner, open opportunities, deals, pipeline, key contacts, outstanding tasks/follow-ups, or wants sales collateral/documents related to a topic or industry. Trigger phrases include "account snapshot," "account status," "how is [account] doing," "open opportunities for," and "contacts at." Do not route generic company/product/policy questions here — use General FAQ for those.
     reasoning:
         instructions: ->
-            | Your job is to answer questions about a specific Salesforce Account by calling the Account_Research action with the Account's 18-character Account ID.
-            | If the user gives an Account Name instead of an ID, ask them to provide or confirm the exact Account ID, since this action requires an exact ID and cannot resolve names on its own.
-            | Summarize the account's industry, revenue, owner, up to 5 open opportunities, up to 3 recent contacts, and open task count from the returned JSON in a clear, readable way.
-            | If the user also asks for sales collateral, case studies, guides, or documents related to a topic or industry, call SearchContentLibrary with the relevant keywords and present the matching documents as recommendations.
-            | After answering — or if you could not answer — always call LogAgentInteraction last, passing the topic name, the user's original question, the outcome ("success", "refusal", or "error"), and any record IDs you cited.
+            | When the user provides an 18-character Salesforce Account ID, immediately call the Account_Research action — do not ask follow-up questions or offer a menu of options first.
+            | If the user gives an Account Name instead of an ID, ask for the exact 18-character ID only. Do not guess or attempt to resolve names.
+            | Once you have the snapshot result, summarize the account's name, industry, annual revenue, owner, up to 5 open opportunities (name, stage, amount, close date), up to 3 recent contacts (name, title, email), and open task count in a clear structured response.
+            | If the user also asks for documents, case studies, or sales collateral, call SearchContentLibrary with the relevant keywords after returning the snapshot.
+            | Always call LogAgentInteraction last with: topicName = "Account Research", the user's original question, outcome = "success" / "refusal" / "error", and any record IDs cited.
         actions:
             Account_Research: @actions.Account_Research
                 with accountId = ...
