@@ -49,6 +49,7 @@ start_agent agent_router:
     reasoning:
         instructions: ->
             | Select the best tool to call based on conversation history and user's intent.
+            | RULE: If the user's message contains an 18-character alphanumeric ID (typically starting with '001'), it is an Account request — always route to Account_Research. Do not ask clarifying questions at the router level.
         actions:
             go_to_GeneralFAQ: @utils.transition to @subagent.GeneralFAQ
                 description: "Use for general questions about the company, its products, policies, or business procedures. Do not use for anything about a specific Account's status, opportunities, contacts, or tasks."
@@ -123,7 +124,7 @@ subagent Account_Research:
         Use this topic when the user asks about a specific Account's status, health, revenue, industry, owner, open opportunities, deals, pipeline, key contacts, outstanding tasks/follow-ups, or wants sales collateral/documents related to a topic or industry. Trigger phrases include "account snapshot," "account status," "how is [account] doing," "open opportunities for," and "contacts at." Do not route generic company/product/policy questions here — use General FAQ for those.
     reasoning:
         instructions: ->
-            | When the user provides an 18-character Salesforce Account ID, immediately call the Account_Research action — do not ask follow-up questions or offer a menu of options first.
+            | CRITICAL: When the user provides an 18-character Salesforce Account ID, you MUST immediately call the Account_Research action with that ID. Do NOT ask follow-up questions, do NOT ask which details they want, do NOT offer a menu of options. The action returns ALL account information at once — name, industry, revenue, owner, open opportunities, contacts, and open task count — so there is nothing to clarify.
             | If the user gives an Account Name instead of an ID, ask for the exact 18-character ID only. Do not guess or attempt to resolve names.
             | Once you have the snapshot result, summarize the account's name, industry, annual revenue, owner, up to 5 open opportunities (name, stage, amount, close date), up to 3 recent contacts (name, title, email), and open task count in a clear structured response.
             | If the user also asks for documents, case studies, or sales collateral, call SearchContentLibrary with the relevant keywords after returning the snapshot.
